@@ -292,43 +292,7 @@ def convert_to_block(id, project_id, content, session):
         utils.log(f"{action}异常: {exc}")
     utils.log_request_duration(action, start_time)
 
-    def upload_file_to_notion(file_name, file_content):
-        file_size = len(file_content)
-        if file_size == 0:
-            utils.log("文件内容为空，跳过上传")
-            return None
-        file_uploads_endpoint = getattr(notion_helper.client, "file_uploads", None)
-        if file_uploads_endpoint:
-            file_size = len(response.content)
-            with open("debug_downloaded_file", "wb") as f:
-                f.write(response.content)
-            utils.log(f"上传Notion文件，文件名: {file_name}, 大小: {file_size} 字节")
-            if file_size > 20 * 1024 * 1024:
-                pass  # Notion SDK目前不支持大于20MB的文件上传
-            try:
-                create_resp = file_uploads_endpoint.create(
-                    mode="single_part",
-                    filename=file_name,
-                )
-                file_upload_id = create_resp.get("id")
-                utils.log(f"创建文件上传，文件ID: {file_upload_id}")
-                file_like = io.BytesIO(file_content)
-                file_like.name = file_name  # type: ignore[attr-defined]
-                file_like.seek(0)
-                send_resp = file_uploads_endpoint.send(
-                    file_upload_id=file_upload_id,
-                    file=file_like,
-                )
-                utils.log(f"发送文件上传，响应状态: {send_resp.get('status')}")
-                if send_resp.get("status") != "uploaded":
-                    raise Exception(
-                        f"File upload failed with status: {send_resp.get('status')}"
-                    )
 
-                return file_upload_id
-            except Exception as exc:
-                utils.log(f"上传Notion文件异常: {exc}")
-                return None
 
     def process_image_blocks(block_list):
         for block in block_list:
@@ -341,34 +305,35 @@ def convert_to_block(id, project_id, content, session):
                 paths = unquote(parsed_url.path).strip("/").split("/")
                 if len(paths) < 2:
                     continue
-                utils.log(f"处理图片块，Url: {paths}")
                 dir_name = paths[-2]
                 file_name = paths[-1]
-                utils.log(f"处理图片块，文件名: {mimetypes.guess_type(file_name)[0]}")
-                download_url = f"https://api.dida365.com/api/v1/attachment/{project_id}/{id}/{dir_name}?action=download"
-                action_download = f"下载图片 {download_url}"
-                utils.log(f"开始{action_download}")
-                download_start_time = time.time()
-                response = session.get(download_url, headers=headers)
-                utils.log(f"完成{action_download} {response.status_code} ")
-                with open("debug_downloaded_image.png", "wb") as f:
-                    f.write(response.content)
-                utils.log_request_duration(action_download, download_start_time)
+                image_url = f"https://api.dida365.com/api/v1/attachment/{project_id}/{id}/{dir_name}?action=download"
+                
+                utils.log(f"开始获取图片: {file_name}")
+                response = session.get(image_url, headers=headers)
                 if response.status_code == 200:
-                    file_upload_id = upload_file_to_notion(
-                        file_name, response.content
+                    utils.log(f"下载成功，开始上传到Notion")
+                    image_payload = notion_helper.upload_content_to_notion(
+                        file_name, response.content, image_url, image_url
                     )
-                    utils.log(f"上传Notion文件，文件ID: {file_upload_id}")
-                    if file_upload_id:
-                        image_block = {
-                            "type": "file_upload",
-                            "file_upload": {"id": file_upload_id},
-                        }
+                    
+                    if image_payload:
+                        utils.log(f"上传Notion完成，Payload: {image_payload}")
                         caption = block.get(type, {}).get("caption")
-                        if caption:
-                            image_block["caption"] = caption
-                        utils.log(f"更新图片块链接，文件ID: {image_block}")
-                        block[type] = image_block
+                        payload_type = image_payload.get("type")
+                        if payload_type and caption:
+                            if image_payload.get(payload_type):
+                                image_payload[payload_type]["caption"] = caption
+                        
+                        # Handle potential type change (e.g. image -> file_upload)
+                        new_type = image_payload.get("type")
+                        if new_type and new_type != type:
+                             block.pop(type)
+                             block["type"] = new_type
+                             block[new_type] = image_payload[new_type]
+                        else:
+                            block[type] = image_payload
+
                 else:
                     utils.log(f"文件下载失败，状态码: {response.status_code}")
             # 递归处理子块中的图片

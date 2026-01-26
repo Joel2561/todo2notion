@@ -243,3 +243,130 @@ class NotionHelper:
             ]
         )
 
+
+    def _prepare_image_url(self, url):
+        import uuid
+        import mimetypes
+        if not url:
+            return None
+        # Skip uploading Notion hosted assets
+        if url.startswith("https://www.notion.so/"):
+            icon_payload = get_icon(url)
+            return icon_payload
+
+
+        parsed_original_url = urlparse(url)
+        candidate_urls = [url]
+        if parsed_original_url.path and not parsed_original_url.path.endswith(".webp"):
+            base, sep, _ = parsed_original_url.path.rpartition(".")
+            if sep:
+                new_path = f"{base}.webp"
+            else:
+                new_path = f"{parsed_original_url.path}.webp"
+            candidate_urls.append(parsed_original_url._replace(path=new_path).geturl())
+
+        response = None
+        download_url = None
+        for candidate in candidate_urls:
+            request_headers = {
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            parsed_candidate = urlparse(candidate)
+            if parsed_candidate.netloc:
+                request_headers["host"] = parsed_candidate.netloc
+            try:
+                resp = requests.get(candidate, timeout=15, headers=request_headers)
+                resp.raise_for_status()
+            except Exception as exc:
+                logging.warning("Failed to download image from %s: %s", candidate, exc)
+                continue
+            if not resp.content:
+                logging.warning("Empty image content downloaded from %s", candidate)
+                continue
+            response = resp
+            download_url = candidate
+            break
+
+        if response is None or download_url is None:
+            icon_payload = get_icon(url)
+            return icon_payload
+
+        filename = os.path.basename(unquote(urlparse(download_url).path))
+        if not filename:
+            filename = f"icon-{uuid.uuid4().hex}"
+
+        content_type = response.headers.get("Content-Type")
+        if not os.path.splitext(filename)[1]:
+            guessed_ext = mimetypes.guess_extension(content_type or "")
+            if guessed_ext:
+                filename = f"{filename}{guessed_ext}"
+        
+        return self.upload_content_to_notion(filename, response.content, url, download_url)
+
+    def upload_content_to_notion(self, filename, content, original_url, download_url=None):
+        import io
+        file_uploads_endpoint = getattr(self.client, "file_uploads", None)
+        if file_uploads_endpoint:
+            file_size = len(content)
+            if file_size > 20 * 1024 * 1024:
+                logging.warning("Image %s exceeds Notion upload limit", filename)
+                fallback_icon = get_icon(download_url or original_url)
+                return fallback_icon
+
+            try:
+                create_resp = file_uploads_endpoint.create(
+                    mode="single_part",
+                    filename=filename,
+                )
+                file_upload_id = create_resp.get("id")
+                if not file_upload_id:
+                    logging.warning("Notion did not return file_upload_id for %s", original_url)
+                    fallback_icon = get_icon(download_url or original_url)
+                    return fallback_icon
+
+                file_like = io.BytesIO(content)
+                file_like.name = filename  # type: ignore[attr-defined]
+                file_like.seek(0)
+                send_resp = file_uploads_endpoint.send(
+                    file_upload_id=file_upload_id,
+                    file=file_like,
+                )
+                if send_resp.get("status") != "uploaded":
+                    logging.warning(
+                        "Notion file_upload send returned status %s for %s",
+                        send_resp.get("status"),
+                        original_url,
+                    )
+                    fallback_icon = get_icon(download_url or original_url)
+                    return fallback_icon
+
+                uploaded_resource = {
+                    "type": "file_upload",
+                    "file_upload": {"id": file_upload_id},
+                }
+                # Wrap it in external structure as fallback or use directly?
+                # The original code returned uploaded_resource directly as icon_payload
+                # But typically Notion API expects 'external' or 'file' for icon.
+                # However douban2notion returns this custom payload.
+                # Let's trust douban2notion implementation.
+                return uploaded_resource
+            except Exception as exc:
+                logging.warning(
+                    "Failed to upload image via Notion file_uploads API for %s: %s",
+                    original_url,
+                    exc,
+                )
+                fallback_icon = get_icon(download_url or original_url)
+                return fallback_icon
+
+        else:
+            logging.warning(
+                "Notion file_uploads endpoint unavailable; returning original URL for %s",
+                original_url,
+            )
+        icon_payload = get_icon(download_url or original_url)
+        return icon_payload
+
+    def upload_image_to_notion(self, url):
+        return self._prepare_image_url(url)
+
