@@ -25,14 +25,9 @@ HEADERS = {
 }
 
 
-def login(username, password):
+def get_dida_session():
     session = requests.Session()
-    login_url = "https://api.dida365.com/api/v2/user/signon?wc=true&remember=true"
-    payload = {"username": username, "password": password}
-    response = session.post(login_url, json=payload, headers=HEADERS)
-    if response.status_code == 200:
-        print("登录成功")
-        return session
-    else:
-        print(f"登录失败，状态码: {response.status_code}")
-        return None
+    headers = HEADERS.copy()
+    headers["cookie"] = os.getenv("COOKIE")
+    session.headers.update(headers)
+    return session

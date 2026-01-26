@@ -24,7 +24,7 @@ load_dotenv()
 
 headers = HEADERS.copy()
 headers["cookie"] = os.getenv("COOKIE")
-MARKDOWN_SERVER_URL = os.getenv("MARKDOWN_SERVER_URL", "http://127.0.0.1:8787")
+MARKDOWN_SERVER_URL = os.getenv("MARKDOWN_SERVER_URL", "https://md2notion.notionhub.app/")
 
 
 def is_task_modified(item, todo_dict):

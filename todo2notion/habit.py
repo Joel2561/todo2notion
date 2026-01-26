@@ -10,7 +10,7 @@ from todo2notion import utils
 import random
 from dotenv import load_dotenv
 from bson import ObjectId
-from todo2notion.dida_api import HEADERS as headers, login
+from todo2notion.dida_api import HEADERS as headers, get_dida_session
 
 load_dotenv()
 
@@ -259,9 +259,7 @@ def insert_to_dida(session, habit_record_dict2, habit_dict2):
 
 def main():
     config = notion_helper.config
-    username = config.get("滴答清单账号")
-    password = config.get("滴答清单密码")
-    session = login(username, password)
+    session = get_dida_session()
     habits = notion_helper.query_all(notion_helper.habit_database_id)
     habit_dict = {}
     habit_dict2 = {}

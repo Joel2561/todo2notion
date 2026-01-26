@@ -9,7 +9,7 @@ from todo2notion.notion_helper import NotionHelper
 import requests
 from todo2notion import utils
 from dotenv import load_dotenv
-from todo2notion.dida_api import HEADERS as headers, login
+from todo2notion.dida_api import HEADERS as headers, get_dida_session
 
 load_dotenv()
 
@@ -84,11 +84,12 @@ def get_pomodoros():
             if len(tasks):
                 result["title"] = tasks[0].get("title")
                 result["task_id"] = tasks[0].get("taskId")
+                result["project_id"] = tasks[0].get("projectId")
                 result["project_name"] = tasks[0].get("projectName")
     return results
 
 
-def insert_tamato():
+def insert_tamato(project_dict):
     d = notion_helper.get_property_type(notion_helper.tomato_database_id)
     items = get_pomodoros()
     items = list(filter(is_tomato_modified, items))
@@ -106,8 +107,8 @@ def insert_tamato():
         if item.get("task_id") and item.get("task_id") in todo_dict:
             tomato["任务"] = [todo_dict.get(item.get("task_id")).get("id")]
             tomato["任务id"] = item.get("task_id")
-        if item.get("project_name"):
-            tomato["清单"] = item.get("project_name")
+        if item.get("project_id") and item.get("project_id") in project_dict:
+            tomato["清单"] = [project_dict.get(item.get("project_id")).get("id")]
         properties = utils.get_properties(tomato, d)
         notion_helper.get_date_relation(properties, pendulum.parse(item.get("endTime")))
         parent = {
@@ -165,9 +166,11 @@ notion_helper = NotionHelper()
 
 if __name__ == "__main__":
     config = notion_helper.config
-    username = config.get("滴答清单账号")
-    password = config.get("滴答清单密码")
-    session = login(username, password)
+    session = get_dida_session()
+    projects = notion_helper.query_all(notion_helper.project_database_id)
+    project_dict = {}
+    for item in projects:
+        project_dict[utils.get_property_value(item.get("properties").get("id"))] = item
     todos = notion_helper.query_all(notion_helper.todo_database_id)
     todo_dict = {}
     for todo in todos:
@@ -176,4 +179,4 @@ if __name__ == "__main__":
     tomato_dict = {}
     for tomato in tomatos:
         tomato_dict[utils.get_property_value(tomato.get("properties").get("id"))] = tomato
-    insert_tamato()
+    insert_tamato(project_dict)
