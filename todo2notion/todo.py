@@ -12,8 +12,6 @@ from urllib.parse import unquote, urlparse
 
 import pendulum
 from todo2notion.notion_helper import NotionHelper, TAG_ICON_URL
-import mistletoe
-from todo2notion.notion_renderer import NotionPyRenderer
 import requests
 from dotenv import load_dotenv
 
