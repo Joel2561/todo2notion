@@ -23,8 +23,6 @@ from dotenv import load_dotenv
 from urllib.parse import unquote, urlparse
 
 import requests
-from notion_client import Client
-from retrying import retry
 load_dotenv()
 TAG_ICON_URL = "https://www.notion.so/icons/tag_gray.svg"
 USER_ICON_URL = "https://www.notion.so/icons/user-circle-filled_gray.svg"

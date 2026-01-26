@@ -7,45 +7,11 @@ import os
 import pendulum
 from todo2notion.notion_helper import NotionHelper
 import requests
-import utils
+from todo2notion import utils
 from dotenv import load_dotenv
+from todo2notion.dida_api import HEADERS as headers, login
 
 load_dotenv()
-
-
-def login(username, password):
-    session = requests.Session()
-    login_url = "https://api.dida365.com/api/v2/user/signon?wc=true&remember=true"
-    payload = {"username": username, "password": password}
-    response = session.post(login_url, json=payload, headers=headers)
-
-    if response.status_code == 200:
-        print("登录成功")
-        return session
-    else:
-        print(f"登录失败，状态码: {response.status_code}")
-        return None
-
-
-headers = {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-    "hl": "zh_CN",
-    "origin": "https://dida365.com",
-    "priority": "u=1, i",
-    "referer": "https://dida365.com/",
-    "sec-ch-ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"macOS"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "traceid": "6721a893b8de3a0431a1548c",
-    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-    "x-csrftoken": "GpesKselqEa9oKJQRM3bj8tkdT2kJVNSNaZ9eM0i3Q-1730258339",
-    "x-device": '{"platform":"web","os":"macOS 10.15.7","device":"Chrome 130.0.0.0","name":"","version":6101,"id":"6721a59761bd871d7ba24b96","channel":"website","campaign":"","websocket":"6721a7eab8de3a0431a153ae"}',
-    "x-tz": "Asia/Shanghai",
-}
 
 
 def is_task_modified(item):
