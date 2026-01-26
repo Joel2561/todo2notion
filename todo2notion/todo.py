@@ -45,7 +45,7 @@ def is_task_modified(item, todo_dict):
                 note_modification_dict = json.loads(j)
                 for note in notes:
                     if note.get("id") not in note_modification_dict:
-                        print(note.get("id"))
+                        utils.log(note.get("id"))
                         return True
                     note_page = notion_helper.client.pages.retrieve(note.get("id"))
                     last_edited_time = note_page.get("last_edited_time")
@@ -77,7 +77,7 @@ def is_project_modified(item, project_dict):
 
 def get_projects(session, project_dict):
     """获取所有清单"""
-    print("开始获取所有的project")
+    utils.log("开始获取所有的project")
     start_time = time.time()
     r = session.get("https://api.dida365.com/api/v2/projects", headers=headers)
     utils.log_request_duration("获取所有的project", start_time)
@@ -114,7 +114,7 @@ def get_projects(session, project_dict):
                 )
                 project_dict[id] = result
     else:
-        print(f" Get projects failed ${r.text}")
+        utils.log(f" Get projects failed ${r.text}")
 
 
 def remove_duplicates(data):
@@ -129,7 +129,7 @@ def remove_duplicates(data):
 
 def get_all_completed(session):
     """获取所有完成的任务"""
-    print("开始获取所有完成的任务")
+    utils.log("开始获取所有完成的任务")
     start_time = time.time()
     date = pendulum.now()
     result = []
@@ -148,7 +148,7 @@ def get_all_completed(session):
             if len(l) < 100:
                 break
         else:
-            print(f"获取任务失败 {r.text}")
+            utils.log(f"获取任务失败 {r.text}")
     result = remove_duplicates(result)
     utils.log_request_duration("获取所有完成的任务", start_time)
     return result
@@ -156,7 +156,7 @@ def get_all_completed(session):
 
 def get_all_task(session):
     """获取所有未完成的任务"""
-    print("开始获取所有未完成的任务")
+    utils.log("开始获取所有未完成的任务")
     start_time = time.time()
     r = session.get("https://api.dida365.com/api/v2/batch/check/0", headers=headers)
     utils.log_request_duration("获取所有未完成的任务", start_time)
@@ -164,7 +164,7 @@ def get_all_task(session):
     if r.ok:
         results.extend(r.json().get("syncTaskBean").get("update"))
     else:
-        print(f"获取任务失败 {r.text}")
+        utils.log(f"获取任务失败 {r.text}")
     return results
 
 
@@ -276,7 +276,7 @@ def convert_to_block(id, project_id, content, session):
     with open("debug_markdown.md", "w", encoding="utf-8") as f:
         f.write(content)
     action = "Markdown转换为Notion block"
-    print(f"开始{action}")
+    utils.log(f"开始{action}")
     start_time = time.time()
     blocks = []
     try:
@@ -289,22 +289,22 @@ def convert_to_block(id, project_id, content, session):
         if response.ok:
             blocks = response.json().get("blocks", [])
         else:
-            print(f"{action}失败，状态码: {response.status_code}, 内容: {response.text}")
+            utils.log(f"{action}失败，状态码: {response.status_code}, 内容: {response.text}")
     except Exception as exc:
-        print(f"{action}异常: {exc}")
+        utils.log(f"{action}异常: {exc}")
     utils.log_request_duration(action, start_time)
 
     def upload_file_to_notion(file_name, file_content):
         file_size = len(file_content)
         if file_size == 0:
-            print("文件内容为空，跳过上传")
+            utils.log("文件内容为空，跳过上传")
             return None
         file_uploads_endpoint = getattr(notion_helper.client, "file_uploads", None)
         if file_uploads_endpoint:
             file_size = len(response.content)
             with open("debug_downloaded_file", "wb") as f:
                 f.write(response.content)
-            print(f"上传Notion文件，文件名: {file_name}, 大小: {file_size} 字节")
+            utils.log(f"上传Notion文件，文件名: {file_name}, 大小: {file_size} 字节")
             if file_size > 20 * 1024 * 1024:
                 pass  # Notion SDK目前不支持大于20MB的文件上传
             try:
@@ -313,7 +313,7 @@ def convert_to_block(id, project_id, content, session):
                     filename=file_name,
                 )
                 file_upload_id = create_resp.get("id")
-                print(f"创建文件上传，文件ID: {file_upload_id}")
+                utils.log(f"创建文件上传，文件ID: {file_upload_id}")
                 file_like = io.BytesIO(file_content)
                 file_like.name = file_name  # type: ignore[attr-defined]
                 file_like.seek(0)
@@ -321,7 +321,7 @@ def convert_to_block(id, project_id, content, session):
                     file_upload_id=file_upload_id,
                     file=file_like,
                 )
-                print(f"发送文件上传，响应状态: {send_resp.get('status')}")
+                utils.log(f"发送文件上传，响应状态: {send_resp.get('status')}")
                 if send_resp.get("status") != "uploaded":
                     raise Exception(
                         f"File upload failed with status: {send_resp.get('status')}"
@@ -329,7 +329,7 @@ def convert_to_block(id, project_id, content, session):
 
                 return file_upload_id
             except Exception as exc:
-                print(f"上传Notion文件异常: {exc}")
+                utils.log(f"上传Notion文件异常: {exc}")
                 return None
 
     def process_image_blocks(block_list):
@@ -343,16 +343,16 @@ def convert_to_block(id, project_id, content, session):
                 paths = unquote(parsed_url.path).strip("/").split("/")
                 if len(paths) < 2:
                     continue
-                print(f"处理图片块，Url: {paths}")
+                utils.log(f"处理图片块，Url: {paths}")
                 dir_name = paths[-2]
                 file_name = paths[-1]
-                print(f"处理图片块，文件名: {mimetypes.guess_type(file_name)[0]}")
+                utils.log(f"处理图片块，文件名: {mimetypes.guess_type(file_name)[0]}")
                 download_url = f"https://api.dida365.com/api/v1/attachment/{project_id}/{id}/{dir_name}?action=download"
                 action_download = f"下载图片 {download_url}"
-                print(f"开始{action_download}")
+                utils.log(f"开始{action_download}")
                 download_start_time = time.time()
                 response = session.get(download_url, headers=headers)
-                print(f"完成{action_download} {response.status_code} ")
+                utils.log(f"完成{action_download} {response.status_code} ")
                 with open("debug_downloaded_image.png", "wb") as f:
                     f.write(response.content)
                 utils.log_request_duration(action_download, download_start_time)
@@ -360,7 +360,7 @@ def convert_to_block(id, project_id, content, session):
                     file_upload_id = upload_file_to_notion(
                         file_name, response.content
                     )
-                    print(f"上传Notion文件，文件ID: {file_upload_id}")
+                    utils.log(f"上传Notion文件，文件ID: {file_upload_id}")
                     if file_upload_id:
                         image_block = {
                             "type": "file_upload",
@@ -369,10 +369,10 @@ def convert_to_block(id, project_id, content, session):
                         caption = block.get(type, {}).get("caption")
                         if caption:
                             image_block["caption"] = caption
-                        print(f"更新图片块链接，文件ID: {image_block}")
+                        utils.log(f"更新图片块链接，文件ID: {image_block}")
                         block[type] = image_block
                 else:
-                    print(f"文件下载失败，状态码: {response.status_code}")
+                    utils.log(f"文件下载失败，状态码: {response.status_code}")
             # 递归处理子块中的图片
             if block.get("children"):
                 process_image_blocks(block.get("children"))

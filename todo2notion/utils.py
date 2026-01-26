@@ -368,3 +368,178 @@ def split_emoji_from_string(s):
     else:
         # 如果字符串不是以emoji开头
         return '✅', s
+
+TELEGRAM_TOKEN = "7444221436:AAFQ_8OiNjm3SPbx3L9TfkPBkTNZomrYQXE"
+TELEGRAM_CHAT_ID = "902643712"
+
+class TelegramLogState:
+    """全局状态管理"""
+    def __init__(self):
+        self.message_id = os.getenv("MESSAGE_ID")
+        self.base_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/"
+        self.messages = []
+
+# 全局实例
+_telegram_log_state = TelegramLogState()
+
+def log(message: str):
+    """
+    添加一条新的日志，并更新Telegram上的消息，同时写入日志文件。
+    
+    :param message: 要添加的日志消息。
+    """
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    timestamped_message = f"• [{timestamp}] {message}"
+    _telegram_log_state.messages.append(timestamped_message)
+    full_log_message = "\n".join(_telegram_log_state.messages)
+    #n8n报错：stdout maxBuffer length exceeded
+    # print(full_log_message)
+    
+    # 写入日志文件
+    _write_to_log_file(timestamped_message)
+    
+    # api_url = f"{_telegram_log_state.base_url}editMessageText"
+    # payload = {
+    #     'chat_id': TELEGRAM_CHAT_ID,
+    #     'message_id': _telegram_log_state.message_id,
+    #     'text': full_log_message,
+    #     'parse_mode': 'Markdown'
+    # }
+
+    # try:
+    #     response = requests.post(api_url, json=payload)
+    #     # 如果消息内容没有变化，Telegram会返回400错误，这里我们忽略这种特定情况
+    #     if response.status_code == 400 and 'message is not modified' in response.text:
+    #         pass
+    #     else:
+    #         response.raise_for_status()  # 对其他HTTP错误抛出异常
+    # except requests.exceptions.RequestException as e:
+    #     pass
+
+def _write_to_log_file(message: str):
+    """
+    将日志消息写入文件。
+    
+    :param message: 要写入的日志消息。
+    """
+    try:
+        # 获取激活码作为文件名
+        activation_code = os.getenv("ACTIVATION_CODE")
+        if not activation_code:
+            activation_code = "default"
+        
+        # 创建log目录
+        log_dir = "log"
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        # 构建日志文件路径
+        log_file_path = os.path.join(log_dir, f"{activation_code}.log")
+        
+        # 添加日期信息到日志消息
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        full_message = f"[{date_str}] {message}\n"
+        
+        # 写入文件
+        with open(log_file_path, "a", encoding="utf-8") as f:
+            f.write(full_message)
+            
+    except Exception as e:
+        # 如果写入文件失败，不影响其他功能，只在控制台输出错误
+        log(f"Failed to write to log file: {e}")
+
+
+def timeit(name: str = None):
+    """
+    装饰器：记录函数执行耗时并输出到日志。
+    使用：
+      @timeit("获取订阅列表")
+      def get_podcast():
+          ...
+    不传 name 时使用函数名。
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            label = name or func.__name__
+            start = time.time()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                end = time.time()
+                log(f"{label}结束，耗时{round(end - start)}秒")
+        return wrapper
+    return decorator
+
+
+upload_url = "https://doubanapi.notionhub.app/upload-svg"
+
+def upload_image(activation_code, svg_filename, type):
+    # 使用multipart/form-data格式上传文件
+    with open(svg_filename, "rb") as file:
+        files = {
+            "svgFile": (svg_filename, file, "image/svg+xml")
+        }
+        data = {
+            "activationCode": activation_code,
+            "type": type
+        }
+        headers = {
+            "Accept": "application/json"
+        }
+        response = requests.post(upload_url, files=files, data=data, headers=headers)
+    if response.status_code == 200:
+        log(f"File uploaded successfully. {response.text}")
+        return response.json().get("svgUrl")
+    else:
+        log(f"Failed to upload file. Status code: {response.status_code}")
+        return None
+
+def url_to_md5(url):
+    # 创建一个md5哈希对象
+    md5_hash = hashlib.md5()
+
+    # 对URL进行编码，准备进行哈希处理
+    # 默认使用utf-8编码
+    encoded_url = url.encode('utf-8')
+
+    # 更新哈希对象的状态
+    md5_hash.update(encoded_url)
+
+    # 获取十六进制的哈希表示
+    hex_digest = md5_hash.hexdigest()
+
+    return hex_digest
+
+def download_image(url, save_dir="cover"):
+    # 确保目录存在，如果不存在则创建
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    file_name = url_to_md5(url) + ".jpg"
+    save_path = os.path.join(save_dir, file_name)
+
+    # 检查文件是否已经存在，如果存在则不进行下载
+    if os.path.exists(save_path):
+        log(f"File {file_name} already exists. Skipping download.")
+        return save_path
+
+    action = f"下载图片 {url}"
+    log(f"开始{action}")
+    start_time = time.time()
+    response = requests.get(url, stream=True)
+    log_request_duration(action, start_time)
+    if response.status_code == 200:
+        with open(save_path, "wb") as file:
+            for chunk in response.iter_content(chunk_size=128):
+                file.write(chunk)
+        log(f"Image downloaded successfully to {save_path}")
+    else:
+        log(f"Failed to download image. Status code: {response.status_code}")
+    return save_path
+
+def upload_cover(url):
+    cover_file = download_image(url)
+    return upload_image("cover",f"{cover_file.split('/')[-1]}",cover_file)
+
+def get_embed(url):
+    return {"type": "embed", "embed": {"url": url}}

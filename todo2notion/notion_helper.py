@@ -33,6 +33,8 @@ BOOKMARK_ICON_URL = "https://www.notion.so/icons/bookmark_gray.svg"
 class NotionHelper:
     database_id_dict = {}
     todo_heatmap_block_id = os.getenv("HEATMAP_BLOCK_ID")
+    tomato_heatmap_block_id = os.getenv("TOMATO_HEATMAP_BLOCK_ID")
+    habit_heatmap_block_id = os.getenv("HABIT_HEATMAP_BLOCK_ID")
     property_dict = {}
     def __init__(self):
         self.client = Client(auth=os.getenv("NOTION_TOKEN"), log_level=logging.ERROR)

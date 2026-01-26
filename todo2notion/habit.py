@@ -83,7 +83,7 @@ def insert_habit_records(session, habit_dict, habit_record_dict, habit_id):
             )
         )
         for index, item in enumerate(items):
-            print(f"一共{len(items)}个，当前是第{index+1}个")
+            utils.log(f"一共{len(items)}个，当前是第{index+1}个")
             id = item.get("id")
             habit_id = item.get("habitId")
             habit_name = utils.get_property_value(
@@ -128,7 +128,7 @@ def insert_habits(habit_dict, habits):
         items = list(
             filter(lambda item: is_habit_modified(habit_dict, item), habits))
         for index, item in enumerate(items):
-            print(f"一共{len(items)}个，当前是第{index+1}个")
+            utils.log(f"一共{len(items)}个，当前是第{index+1}个")
             id = item.get("id")
             habit = {
                 "标题": item.get("name"),
@@ -193,11 +193,11 @@ def habit_check(session, habit_id, record_id, date, value, goal):
         data["add"].append(item)
     else:
         data["update"].append(item)
-    print(data)
+    utils.log(data)
     response = session.post(
         "https://api.dida365.com/api/v2/habitCheckins/batch", headers=headers, json=data
     )
-    print(response.json())
+    utils.log(response.json())
     if response.ok:
         return record_id
     
@@ -247,14 +247,14 @@ def insert_to_dida(session, habit_record_dict2, habit_dict2):
                     notion_records[0].get("properties").get("值"))
                 goal = utils.get_property_value(
                     notion_records[0].get("properties").get("目标"))
-                print(f"str = {date_str} value = {value} goal = {goal}")
+                utils.log(f"str = {date_str} value = {value} goal = {goal}")
                 record_id = habit_check(session, habit_id, None, date_str, value, goal)
                 if record_id:
                     notion_helper.update_page(notion_records[0].get("id"), properties={"id": utils.get_rich_text(record_id)})
                 notion_records.remove(notion_records[0])
             # 将当前页面从notion_records中移除
             for record in notion_records:
-                print(f"删除 {record}")
+                utils.log(f"删除 {record}")
                 notion_helper.delete_block(record.get("id"))
 
 def main():

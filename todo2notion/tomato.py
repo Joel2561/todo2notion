@@ -71,7 +71,7 @@ def get_pomodoros():
             completedTime = l[-1].get("startTime")
             to = pendulum.parse(completedTime).int_timestamp * 1000
         else:
-            print(f"获取任务失败 {r.text}")
+            utils.log(f"获取任务失败 {r.text}")
     results = remove_duplicates(result)
     # 处理result
     for result in results:
@@ -94,7 +94,7 @@ def insert_tamato(project_dict):
     items = get_pomodoros()
     items = list(filter(is_tomato_modified, items))
     for index, item in enumerate(items):
-        print(f"一共{len(items)}个，当前是第{index+1}个")
+        utils.log(f"一共{len(items)}个，当前是第{index+1}个")
         id = item.get("id")
         tomato = {
             "标题": item.get("title"),
@@ -144,7 +144,7 @@ def get_all_completed():
             if len(l) < 100:
                 break
         else:
-            print(f"获取任务失败 {r.text}")
+            utils.log(f"获取任务失败 {r.text}")
     result = remove_duplicates(result)
     return result
 
@@ -156,7 +156,7 @@ def get_all_task():
     if r.ok:
         results.extend(r.json().get("syncTaskBean").get("update"))
     else:
-        print(f"获取任务失败 {r.text}")
+        utils.log(f"获取任务失败 {r.text}")
     return results
 
 
