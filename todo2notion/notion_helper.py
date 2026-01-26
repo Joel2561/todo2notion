@@ -29,15 +29,55 @@ USER_ICON_URL = "https://www.notion.so/icons/user-circle-filled_gray.svg"
 TARGET_ICON_URL = "https://www.notion.so/icons/target_red.svg"
 BOOKMARK_ICON_URL = "https://www.notion.so/icons/bookmark_gray.svg"
 
+from notion_client.helpers import pick
+from notion_client.typing import SyncAsync
+from typing import Any
+
+class FileUploadsEndpoint:
+    def __init__(self, parent):
+        self.parent = parent
+
+    def create(self, **kwargs: Any) -> SyncAsync[Any]:
+        return self.parent.request(
+            path="file_uploads",
+            method="POST",
+            body=pick(
+                kwargs,
+                "mode",
+                "filename",
+                "content_type",
+                "number_of_parts",
+                "external_url",
+            ),
+            auth=kwargs.get("auth"),
+        )
+
+    def complete(self, file_upload_id: str, **kwargs: Any) -> SyncAsync[Any]:
+        return self.parent.request(
+            path=f"file_uploads/{file_upload_id}/complete",
+            method="POST",
+            auth=kwargs.get("auth"),
+        )
+
+    def send(self, file_upload_id: str, **kwargs: Any) -> SyncAsync[Any]:
+        return self.parent.request(
+            path=f"file_uploads/{file_upload_id}/send",
+            method="POST",
+            form_data=pick(kwargs, "file", "part_number"),
+            auth=kwargs.get("auth"),
+        )
 
 class NotionHelper:
     database_id_dict = {}
-    todo_heatmap_block_id = os.getenv("HEATMAP_BLOCK_ID")
-    tomato_heatmap_block_id = os.getenv("TOMATO_HEATMAP_BLOCK_ID")
-    habit_heatmap_block_id = os.getenv("HABIT_HEATMAP_BLOCK_ID")
     property_dict = {}
     def __init__(self):
-        self.client = Client(auth=os.getenv("NOTION_TOKEN"), log_level=logging.ERROR)
+        self.notion_token = os.getenv("NOTION_TOKEN")
+        self.client = Client(auth=self.notion_token, log_level=logging.ERROR)
+        
+        # Monkey patch file_uploads if not exists
+        if not hasattr(self.client, "file_uploads"):
+            self.client.file_uploads = FileUploadsEndpoint(self.client)
+            
         self.__cache = {}
         self.todo_database_id = os.getenv("TASK_DATABASE_ID")
         self.project_database_id = os.getenv("LIST_DATABASE_ID")
@@ -50,6 +90,9 @@ class NotionHelper:
         self.habit_database_id = os.getenv("HABIT_DATABASE_ID")
         self.habit_record_database_id = os.getenv("HABIT_RECORD_DATABASE_ID")
         self.tomato_database_id = os.getenv("TOMATO_DATABASE_ID")
+        self.todo_heatmap_block_id = os.getenv("HEATMAP_BLOCK_ID")
+        self.tomato_heatmap_block_id = os.getenv("TOMATO_HEATMAP_BLOCK_ID")
+        self.habit_heatmap_block_id = os.getenv("HABIT_HEATMAP_BLOCK_ID")
               
     def get_property_type(self,database_id):
         """获取一个database的property和类型的映射关系"""

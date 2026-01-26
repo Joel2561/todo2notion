@@ -320,20 +320,16 @@ def convert_to_block(id, project_id, content, session):
                     if image_payload:
                         utils.log(f"上传Notion完成，Payload: {image_payload}")
                         caption = block.get(type, {}).get("caption")
-                        payload_type = image_payload.get("type")
-                        if payload_type and caption:
-                            if image_payload.get(payload_type):
-                                image_payload[payload_type]["caption"] = caption
                         
-                        # Handle potential type change (e.g. image -> file_upload)
-                        new_type = image_payload.get("type")
-                        if new_type and new_type != type:
-                             block.pop(type)
-                             block["type"] = new_type
-                             block[new_type] = image_payload[new_type]
-                        else:
-                            block[type] = image_payload
-
+                        # Apply caption to the inner content if present
+                        inner_type = image_payload.get("type")
+                        if inner_type and caption:
+                            if image_payload.get(inner_type):
+                                image_payload[inner_type]["caption"] = caption
+                        
+                        # Simply update the content of the existing block type (image or file)
+                        # The payload from notion_helper is already structured correctly for the inner key
+                        block[type] = image_payload
                 else:
                     utils.log(f"文件下载失败，状态码: {response.status_code}")
             # 递归处理子块中的图片
