@@ -47,6 +47,9 @@ class NotionHelper:
         self.month_database_id = os.getenv("MONTH_DATABASE_ID")
         self.year_database_id = os.getenv("YEAR_DATABASE_ID")
         self.all_database_id = os.getenv("ALL_DATABASE_ID")
+        self.habit_database_id = os.getenv("HABIT_DATABASE_ID")
+        self.habit_record_database_id = os.getenv("HABIT_RECORD_DATABASE_ID")
+        self.tomato_database_id = os.getenv("TOMATO_DATABASE_ID")
               
     def get_property_type(self,database_id):
         """获取一个database的property和类型的映射关系"""
