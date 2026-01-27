@@ -1,13 +1,8 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
-import argparse
-import io
 import json
-import math
-import mimetypes
 import os
 import time
-from typing import List
 from urllib.parse import unquote, urlparse
 
 import pendulum
